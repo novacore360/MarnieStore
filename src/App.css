@@ -527,65 +527,9 @@ body {
   font-size: 14px;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .glass-container {
-    padding: 20px;
-  }
-  
-  .header h1 {
-    font-size: 22px;
-  }
-  
-  .info-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  
-  .info-item h2 {
-    font-size: 24px;
-  }
-  
-  .purchase-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .item {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  
-  .item span:first-child {
-    flex: 1 1 100%;
-  }
-  
-  .item span:nth-child(2),
-  .item span:last-child {
-    flex: 1;
-  }
-}
-
-@media (max-width: 480px) {
-  .glass-container {
-    padding: 16px;
-  }
-  
-  .search-section {
-    flex-direction: column;
-  }
-  
-  .clear-btn {
-    width: 100%;
-  }
-  
-  .purchase-amount {
-    flex-direction: column;
-    gap: 8px;
-    text-align: center;
-  }
-  /* Tab Navigation */
+/* ============================================
+   TAB NAVIGATION STYLES
+   ============================================ */
 .tabs {
   display: flex;
   gap: 8px;
@@ -788,7 +732,47 @@ body {
   list-style: none;
 }
 
+/* ============================================
+   RESPONSIVE DESIGN - KEEP ALL @media TOGETHER
+   ============================================ */
 @media (max-width: 768px) {
+  .glass-container {
+    padding: 20px;
+  }
+  
+  .header h1 {
+    font-size: 22px;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .info-item h2 {
+    font-size: 24px;
+  }
+  
+  .purchase-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .item {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .item span:first-child {
+    flex: 1 1 100%;
+  }
+  
+  .item span:nth-child(2),
+  .item span:last-child {
+    flex: 1;
+  }
+  
   .tabs {
     gap: 4px;
   }
@@ -812,5 +796,24 @@ body {
   .recent-amount {
     justify-content: center;
   }
+}
 
+@media (max-width: 480px) {
+  .glass-container {
+    padding: 16px;
+  }
+  
+  .search-section {
+    flex-direction: column;
+  }
+  
+  .clear-btn {
+    width: 100%;
+  }
+  
+  .purchase-amount {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
 }
