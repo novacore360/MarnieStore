@@ -1,19 +1,16 @@
 /* eslint-disable no-restricted-globals */
 
+// IMPORTANT: Workbox manifest placeholder - prevents the error
+self.__WB_MANIFEST;
+
 const CACHE_NAME = 'marnie-store-v1';
 const urlsToCache = [
   '/',
   '/index.html',
   '/offline.html',
-  '/static/js/main.chunk.js',
-  '/static/js/0.chunk.js',
-  '/static/js/bundle.js',
-  '/manifest.json',
-  '/logo192.png',
-  '/logo512.png'
+  '/manifest.json'
 ];
 
-// Install service worker
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -22,13 +19,12 @@ self.addEventListener('install', event => {
         return cache.addAll(urlsToCache);
       })
   );
+  self.skipWaiting();
 });
 
-// Fetch with network-first strategy for API, cache-first for static
 self.addEventListener('fetch', event => {
   const url = event.request.url;
   
-  // For Firebase API requests - network first
   if (url.includes('firebase') || url.includes('googleapis')) {
     event.respondWith(
       fetch(event.request)
@@ -36,9 +32,7 @@ self.addEventListener('fetch', event => {
           return caches.match(event.request);
         })
     );
-  } 
-  // For static assets - cache first
-  else {
+  } else {
     event.respondWith(
       caches.match(event.request)
         .then(response => {
@@ -67,7 +61,6 @@ self.addEventListener('fetch', event => {
   }
 });
 
-// Activate and clean up old caches
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
@@ -81,4 +74,5 @@ self.addEventListener('activate', event => {
       );
     })
   );
+  self.clients.claim();
 });
