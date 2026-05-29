@@ -18,7 +18,7 @@ function App() {
     loadCustomers();
   }, []);
 
-  // Load purchases from localStorage on mount
+  // Load saved customer from localStorage on mount (auto-reload purchases)
   useEffect(() => {
     const savedCustomerId = localStorage.getItem('selectedCustomerId');
     const savedCustomerData = localStorage.getItem('selectedCustomerData');
@@ -39,19 +39,26 @@ function App() {
   useEffect(() => {
     const updateTheme = () => {
       const hour = new Date().getHours();
+      // Dawn: 5am - 8am (sunrise)
       if (hour >= 5 && hour < 8) {
         setTheme('dawn');
-      } else if (hour >= 8 && hour < 17) {
+      } 
+      // Morning: 8am - 5pm
+      else if (hour >= 8 && hour < 17) {
         setTheme('morning');
-      } else if (hour >= 17 && hour < 19) {
+      } 
+      // Sunset: 5pm - 7pm
+      else if (hour >= 17 && hour < 19) {
         setTheme('sunset');
-      } else {
+      } 
+      // Night: 7pm - 5am
+      else {
         setTheme('night');
       }
     };
     
     updateTheme();
-    const interval = setInterval(updateTheme, 60000);
+    const interval = setInterval(updateTheme, 60000); // Check every minute
     return () => clearInterval(interval);
   }, []);
 
@@ -138,6 +145,7 @@ function App() {
     setSuggestions([]);
     setShowSuggestions(false);
     loadPurchases(customer.id);
+    // Save to localStorage so it reloads on page refresh
     localStorage.setItem('selectedCustomerId', customer.id);
     localStorage.setItem('selectedCustomerData', JSON.stringify(customer));
   };
@@ -162,6 +170,12 @@ function App() {
       .reduce((sum, p) => sum + (p.total_amount || 0), 0);
   };
 
+  const getPaidTotal = () => {
+    return purchases
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.total_amount || 0), 0);
+  };
+
   const getPendingCount = () => {
     return purchases.filter(p => p.status !== 'paid').length;
   };
@@ -178,6 +192,17 @@ function App() {
     });
   };
 
+  // Get theme display name
+  const getThemeName = () => {
+    switch(theme) {
+      case 'dawn': return 'Sunrise';
+      case 'morning': return 'Morning';
+      case 'sunset': return 'Sunset';
+      case 'night': return 'Night';
+      default: return 'Morning';
+    }
+  };
+
   return (
     <div className="app">
       <div className="glass-container">
@@ -185,10 +210,11 @@ function App() {
           <h1>Purchase History</h1>
           <div className="theme-indicator">
             <span className={`theme-dot theme-${theme}`}></span>
-            <span>{theme.charAt(0).toUpperCase() + theme.slice(1)}</span>
+            <span>{getThemeName()}</span>
           </div>
         </header>
 
+        {/* Search Section - My Purchase Tab */}
         <div className="search-section">
           <div className="search-wrapper">
             <input
@@ -227,11 +253,12 @@ function App() {
           
           {selectedCustomer && (
             <button className="clear-btn" onClick={handleClearCustomer}>
-              Clear
+              Change Customer
             </button>
           )}
         </div>
 
+        {/* Customer Info Card - Shows after customer is selected */}
         {selectedCustomer && (
           <>
             <div className="customer-info">
@@ -239,8 +266,8 @@ function App() {
                 <div className="info-item">
                   <label>Customer</label>
                   <h2>{selectedCustomer.name}</h2>
-                  {selectedCustomer.phone && <p>{selectedCustomer.phone}</p>}
-                  {selectedCustomer.email && <p>{selectedCustomer.email}</p>}
+                  {selectedCustomer.phone && <p>Phone: {selectedCustomer.phone}</p>}
+                  {selectedCustomer.email && <p>Email: {selectedCustomer.email}</p>}
                 </div>
                 <div className="info-item">
                   <label>Total Spent</label>
@@ -252,14 +279,16 @@ function App() {
                   <p>{getPendingCount()} order(s)</p>
                 </div>
                 <div className="info-item">
-                  <label>Total Orders</label>
-                  <h2>{purchases.length}</h2>
+                  <label>Paid Amount</label>
+                  <h2>${getPaidTotal().toFixed(2)}</h2>
+                  <p>{purchases.filter(p => p.status === 'paid').length} paid orders</p>
                 </div>
               </div>
             </div>
 
+            {/* Purchase History List */}
             <div className="purchases-section">
-              <h3>Purchase History</h3>
+              <h3>Purchase History ({purchases.length} orders)</h3>
               {loading ? (
                 <div className="loading">Loading purchases...</div>
               ) : purchases.length === 0 ? (
@@ -280,7 +309,7 @@ function App() {
                       </div>
                       {purchase.product_data && purchase.product_data.length > 0 && (
                         <div className="purchase-items">
-                          <label>Items</label>
+                          <label>Items Purchased</label>
                           <div className="items-list">
                             {purchase.product_data.map((item, idx) => (
                               <div key={idx} className="item">
@@ -300,14 +329,16 @@ function App() {
           </>
         )}
 
+        {/* Welcome State - No customer selected */}
         {!selectedCustomer && !loading && (
           <div className="welcome-state">
-            <div className="welcome-icon">📋</div>
+            <div className="welcome-icon">🔍</div>
             <h3>Search for a Customer</h3>
             <p>Enter a customer name above to view their purchase history</p>
           </div>
         )}
 
+        {/* Loading State */}
         {loading && !selectedCustomer && (
           <div className="loading-state">Loading customers...</div>
         )}
