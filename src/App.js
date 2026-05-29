@@ -388,7 +388,7 @@ function App() {
                 <input
                   type="text"
                   className="search-input"
-                  placeholder="E search imong ngalan ex: doc2, jr, paul"
+                  placeholder="E search imong ngalan ex: doc2, jr, paul..."
                   value={searchTerm}
                   onChange={handleSearchChange}
                   onFocus={() => {
