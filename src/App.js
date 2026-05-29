@@ -4,15 +4,19 @@ import { collection, getDocs } from 'firebase/firestore';
 import './App.css';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('purchase'); // 'purchase', 'dashboard', 'settings'
+  const [activeTab, setActiveTab] = useState('purchase');
   const [customers, setCustomers] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [allPurchases, setAllPurchases] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dashboardSearchTerm, setDashboardSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
+  const [dashboardSuggestions, setDashboardSuggestions] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [dashboardSelectedCustomer, setDashboardSelectedCustomer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showDashboardSuggestions, setShowDashboardSuggestions] = useState(false);
   const [theme, setTheme] = useState('morning');
 
   // Load all customers on mount
@@ -21,7 +25,7 @@ function App() {
     loadAllPurchases();
   }, []);
 
-  // Load saved customer from localStorage on mount (auto-reload purchases)
+  // Load saved customer from localStorage for Purchase tab
   useEffect(() => {
     const savedCustomerId = localStorage.getItem('selectedCustomerId');
     const savedCustomerData = localStorage.getItem('selectedCustomerData');
@@ -37,12 +41,35 @@ function App() {
     }
   }, []);
 
-  // Load purchases when selected customer changes
+  // Load saved customer from localStorage for Dashboard tab
+  useEffect(() => {
+    const savedDashboardCustomerId = localStorage.getItem('dashboardSelectedCustomerId');
+    const savedDashboardCustomerData = localStorage.getItem('dashboardSelectedCustomerData');
+    
+    if (savedDashboardCustomerId && savedDashboardCustomerData) {
+      try {
+        const customer = JSON.parse(savedDashboardCustomerData);
+        setDashboardSelectedCustomer(customer);
+        setDashboardSearchTerm(customer.name);
+      } catch (e) {
+        console.error('Error loading saved dashboard customer:', e);
+      }
+    }
+  }, []);
+
+  // Load purchases when selected customer changes (Purchase tab)
   useEffect(() => {
     if (selectedCustomer) {
       loadPurchases(selectedCustomer.id);
     }
   }, [selectedCustomer]);
+
+  // Load purchases when dashboard selected customer changes
+  useEffect(() => {
+    if (dashboardSelectedCustomer) {
+      loadDashboardPurchases(dashboardSelectedCustomer.id);
+    }
+  }, [dashboardSelectedCustomer]);
 
   // Apply theme based on time of day
   useEffect(() => {
@@ -131,6 +158,28 @@ function App() {
     }
   }, [allPurchases]);
 
+  const loadDashboardPurchases = useCallback(async (customerId) => {
+    if (!customerId) return;
+    
+    setLoading(true);
+    try {
+      const customerPurchases = allPurchases.filter(
+        purchase => purchase.customer_id === customerId
+      );
+      
+      // Store in a separate state or reuse purchases state
+      // For now, we'll reuse the same purchases state
+      setPurchases(customerPurchases.sort((a, b) => 
+        new Date(b.purchase_date) - new Date(a.purchase_date)
+      ));
+    } catch (error) {
+      console.error('Error loading dashboard purchases:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [allPurchases]);
+
+  // Handle search for Purchase tab
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
@@ -148,6 +197,25 @@ function App() {
     setShowSuggestions(true);
   };
 
+  // Handle search for Dashboard tab
+  const handleDashboardSearchChange = (e) => {
+    const value = e.target.value;
+    setDashboardSearchTerm(value);
+    
+    if (value.trim() === '') {
+      setDashboardSuggestions([]);
+      setShowDashboardSuggestions(false);
+      return;
+    }
+    
+    const filtered = customers.filter(customer =>
+      customer.name.toLowerCase().includes(value.toLowerCase())
+    );
+    setDashboardSuggestions(filtered.slice(0, 10));
+    setShowDashboardSuggestions(true);
+  };
+
+  // Handle select customer for Purchase tab
   const handleSelectCustomer = (customer) => {
     setSelectedCustomer(customer);
     setSearchTerm(customer.name);
@@ -157,6 +225,17 @@ function App() {
     localStorage.setItem('selectedCustomerData', JSON.stringify(customer));
   };
 
+  // Handle select customer for Dashboard tab
+  const handleDashboardSelectCustomer = (customer) => {
+    setDashboardSelectedCustomer(customer);
+    setDashboardSearchTerm(customer.name);
+    setDashboardSuggestions([]);
+    setShowDashboardSuggestions(false);
+    localStorage.setItem('dashboardSelectedCustomerId', customer.id);
+    localStorage.setItem('dashboardSelectedCustomerData', JSON.stringify(customer));
+  };
+
+  // Handle clear customer for Purchase tab
   const handleClearCustomer = () => {
     setSelectedCustomer(null);
     setSearchTerm('');
@@ -165,6 +244,17 @@ function App() {
     setShowSuggestions(false);
     localStorage.removeItem('selectedCustomerId');
     localStorage.removeItem('selectedCustomerData');
+  };
+
+  // Handle clear customer for Dashboard tab
+  const handleDashboardClearCustomer = () => {
+    setDashboardSelectedCustomer(null);
+    setDashboardSearchTerm('');
+    setPurchases([]);
+    setDashboardSuggestions([]);
+    setShowDashboardSuggestions(false);
+    localStorage.removeItem('dashboardSelectedCustomerId');
+    localStorage.removeItem('dashboardSelectedCustomerData');
   };
 
   const getTotalSpent = () => {
@@ -187,7 +277,42 @@ function App() {
     return purchases.filter(p => p.status !== 'paid').length;
   };
 
-  // Dashboard statistics
+  // Dashboard statistics for selected customer
+  const getDashboardTotalSpent = () => {
+    if (!dashboardSelectedCustomer) return 0;
+    const customerPurchases = allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id);
+    return customerPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0);
+  };
+
+  const getDashboardPendingTotal = () => {
+    if (!dashboardSelectedCustomer) return 0;
+    const customerPurchases = allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id);
+    return customerPurchases
+      .filter(p => p.status !== 'paid')
+      .reduce((sum, p) => sum + (p.total_amount || 0), 0);
+  };
+
+  const getDashboardPaidTotal = () => {
+    if (!dashboardSelectedCustomer) return 0;
+    const customerPurchases = allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id);
+    return customerPurchases
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.total_amount || 0), 0);
+  };
+
+  const getDashboardOrderCount = () => {
+    if (!dashboardSelectedCustomer) return 0;
+    return allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id).length;
+  };
+
+  const getDashboardCustomerPurchases = () => {
+    if (!dashboardSelectedCustomer) return [];
+    return allPurchases
+      .filter(p => p.customer_id === dashboardSelectedCustomer.id)
+      .sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date));
+  };
+
+  // Overall statistics
   const getTotalCustomers = () => customers.length;
   const getTotalSales = () => allPurchases.reduce((sum, p) => sum + (p.total_amount || 0), 0);
   const getTotalPending = () => allPurchases.filter(p => p.status !== 'paid').reduce((sum, p) => sum + (p.total_amount || 0), 0);
@@ -380,67 +505,165 @@ function App() {
           </div>
         )}
 
-        {/* Dashboard Tab */}
+        {/* Dashboard Tab - Customer Specific */}
         {activeTab === 'dashboard' && (
           <div className="tab-content">
-            <div className="dashboard-stats">
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <div className="stat-icon">👥</div>
-                  <div className="stat-info">
-                    <label>Total Customers</label>
-                    <h2>{getTotalCustomers()}</h2>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon">💰</div>
-                  <div className="stat-info">
-                    <label>Total Sales</label>
-                    <h2>₱{getTotalSales().toFixed(2)}</h2>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon">⏳</div>
-                  <div className="stat-info">
-                    <label>Pending Payments</label>
-                    <h2 className="pending-amount">₱{getTotalPending().toFixed(2)}</h2>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-icon">📦</div>
-                  <div className="stat-info">
-                    <label>Total Orders</label>
-                    <h2>{getTotalOrders()}</h2>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="recent-section">
-              <h3>Recent Transactions</h3>
-              <div className="recent-list">
-                {getRecentTransactions().map(transaction => {
-                  const customer = customers.find(c => c.id === transaction.customer_id);
-                  return (
-                    <div key={transaction.id} className="recent-item">
-                      <div className="recent-info">
-                        <span className="recent-customer">{customer?.name || transaction.customer_name}</span>
-                        <span className="recent-date">{formatDate(transaction.purchase_date)}</span>
+            {/* Customer Search Section */}
+            <div className="search-section">
+              <div className="search-wrapper">
+                <input
+                  type="text"
+                  className="search-input"
+                  placeholder="Search customer to view dashboard..."
+                  value={dashboardSearchTerm}
+                  onChange={handleDashboardSearchChange}
+                  onFocus={() => {
+                    if (dashboardSearchTerm && dashboardSearchTerm.trim()) {
+                      setDashboardSuggestions(
+                        customers.filter(c => c.name.toLowerCase().includes(dashboardSearchTerm.toLowerCase())).slice(0, 10)
+                      );
+                      setShowDashboardSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowDashboardSuggestions(false), 200);
+                  }}
+                />
+                {showDashboardSuggestions && dashboardSuggestions.length > 0 && (
+                  <div className="suggestions-dropdown">
+                    {dashboardSuggestions.map(customer => (
+                      <div
+                        key={customer.id}
+                        className="suggestion-item"
+                        onMouseDown={() => handleDashboardSelectCustomer(customer)}
+                      >
+                        <span className="suggestion-name">{customer.name}</span>
+                        {customer.phone && <span className="suggestion-phone">{customer.phone}</span>}
                       </div>
-                      <div className="recent-amount">
-                        <span className={`status-badge ${transaction.status === 'paid' ? 'status-paid' : 'status-pending'}`}>
-                          {transaction.status || 'pending'}
-                        </span>
-                        <strong>₱{transaction.total_amount?.toFixed(2) || '0.00'}</strong>
-                      </div>
-                    </div>
-                  );
-                })}
-                {getRecentTransactions().length === 0 && (
-                  <div className="empty-state">No transactions found</div>
+                    ))}
+                  </div>
                 )}
               </div>
+              
+              {dashboardSelectedCustomer && (
+                <button className="clear-btn" onClick={handleDashboardClearCustomer}>
+                  Change Customer
+                </button>
+              )}
             </div>
+
+            {/* Customer Dashboard View */}
+            {dashboardSelectedCustomer ? (
+              <>
+                {/* Customer Information Card */}
+                <div className="customer-info">
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <label>Customer Details</label>
+                      <h2>{dashboardSelectedCustomer.name}</h2>
+                      {dashboardSelectedCustomer.phone && <p>📞 {dashboardSelectedCustomer.phone}</p>}
+                      {dashboardSelectedCustomer.email && <p>✉️ {dashboardSelectedCustomer.email}</p>}
+                      <p>🆔 Customer ID: {dashboardSelectedCustomer.id.slice(0, 8)}...</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Total Spent</label>
+                      <h2 className="total-amount">₱{getDashboardTotalSpent().toFixed(2)}</h2>
+                    </div>
+                    <div className="info-item">
+                      <label>Pending Balance</label>
+                      <h2 className="pending-amount">₱{getDashboardPendingTotal().toFixed(2)}</h2>
+                      <p>{allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id && p.status !== 'paid').length} pending order(s)</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Paid Amount</label>
+                      <h2>₱{getDashboardPaidTotal().toFixed(2)}</h2>
+                      <p>{allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id && p.status === 'paid').length} paid orders</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Statistics Summary */}
+                <div className="dashboard-stats">
+                  <div className="stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-icon">📋</div>
+                      <div className="stat-info">
+                        <label>Total Orders</label>
+                        <h2>{getDashboardOrderCount()}</h2>
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">✅</div>
+                      <div className="stat-info">
+                        <label>Completed Orders</label>
+                        <h2>{allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id && p.status === 'paid').length}</h2>
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">⏳</div>
+                      <div className="stat-info">
+                        <label>Pending Orders</label>
+                        <h2 className="pending-amount">{allPurchases.filter(p => p.customer_id === dashboardSelectedCustomer.id && p.status !== 'paid').length}</h2>
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-icon">⭐</div>
+                      <div className="stat-info">
+                        <label>Average Order</label>
+                        <h2>₱{(getDashboardTotalSpent() / (getDashboardOrderCount() || 1)).toFixed(2)}</h2>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Purchase History List */}
+                <div className="purchases-section">
+                  <h3>Purchase History ({getDashboardOrderCount()} orders)</h3>
+                  {loading ? (
+                    <div className="loading">Loading purchases...</div>
+                  ) : getDashboardCustomerPurchases().length === 0 ? (
+                    <div className="empty-state">No purchases found for this customer</div>
+                  ) : (
+                    <div className="purchases-list">
+                      {getDashboardCustomerPurchases().map(purchase => (
+                        <div key={purchase.id} className="purchase-card">
+                          <div className="purchase-header">
+                            <span className="purchase-date">{formatDate(purchase.purchase_date)}</span>
+                            <span className={`status-badge ${purchase.status === 'paid' ? 'status-paid' : 'status-pending'}`}>
+                              {purchase.status || 'pending'}
+                            </span>
+                          </div>
+                          <div className="purchase-amount">
+                            <span>Total Amount</span>
+                            <strong>₱{purchase.total_amount?.toFixed(2) || '0.00'}</strong>
+                          </div>
+                          {purchase.product_data && purchase.product_data.length > 0 && (
+                            <div className="purchase-items">
+                              <label>Items Purchased</label>
+                              <div className="items-list">
+                                {purchase.product_data.map((item, idx) => (
+                                  <div key={idx} className="item">
+                                    <span>{item.name}</span>
+                                    <span>{item.quantity} x ₱{item.price?.toFixed(2)}</span>
+                                    <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="welcome-state">
+                <div className="welcome-icon">📊</div>
+                <h3>Select a Customer to View Dashboard</h3>
+                <p>Search and select a customer above to see their detailed purchase information, statistics, and order history</p>
+              </div>
+            )}
           </div>
         )}
 
